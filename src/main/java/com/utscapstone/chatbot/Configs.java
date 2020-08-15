@@ -15,5 +15,8 @@ public class Configs {
     public static final String CREDENTIALS_FILE_PATH = "/credentials.json";
 
     public static final int TIME_SLOT_NUMBER = 96;
+    public static final String IS_ALL_AVAILABLE = "isAllAvailable";
+    public static final String SUGGESTED_START_TIME = "suggestedStartTime";
+    public static final String SUGGESTED_END_TIME = "suggestedEndTime";
 
 }

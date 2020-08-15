@@ -20,6 +20,8 @@ public class CalendarServices {
 
     //add an event to GG calendar
     public void addEvent(String startTime, String endTime, String[] attendeeEmails) throws IOException {
+        System.out.println(startTime);
+        System.out.println(endTime);
         Event event = new Event()
                 .setSummary("This is the summary")
                 .setLocation("Room test")
@@ -29,7 +31,6 @@ public class CalendarServices {
         event.setStart(new EventDateTime().setDateTime(startDateTime));
 
         DateTime endDateTime = new DateTime(endTime);
-
         event.setEnd(new EventDateTime().setDateTime(endDateTime));
 
         EventAttendee[] attendees = new EventAttendee[attendeeEmails.length];
@@ -40,7 +41,6 @@ public class CalendarServices {
 
         String calendarId = "primary";
         service.events().insert(calendarId, event).execute();
-
     }
 
     //checks all attendees' availability
@@ -53,50 +53,59 @@ public class CalendarServices {
                                               String[] attendeeEmails)
             throws IOException {
 
-        int[] timeSlot;
+        boolean available = true;
         String startTime = Utils.convertToRFC5322(rawDate, rawStartTime);
         String endTime = Utils.convertToRFC5322(rawDate, rawEndTime);
         Map<String, Object> freeInfoMap = new HashMap<>();
-        freeInfoMap.put("isAllAvailable", true);
-        freeInfoMap.put("suggestedTime", "");
-
-        //build the request
-        FreeBusyResponse response = getFreeBusyResponse(startTime, endTime, hostEmail, attendeeEmails);
 
         //checks if all attendees are available within the time frame
         //each entry refers to an attendee
+        FreeBusyResponse response = getFreeBusyResponse(startTime, endTime, hostEmail, attendeeEmails);
         for (Map.Entry<String, FreeBusyCalendar> entry : response.getCalendars().entrySet()) {
             if(!entry.getValue().getBusy().isEmpty()){
-                int duration = Utils.getMeetingDuration(startTime, endTime);
-                int count = 0, startSlot = 0;
-
-                timeSlot = getDayFreeBusy(startTime, rawDate, hostEmail, attendeeEmails);
-
-                for(int i=0; i < timeSlot.length - duration; i++){
-                    if(timeSlot[i] == 1 && count < duration){
-                        count++;
-                    }
-                    else if(timeSlot[i] != 1 && count < duration){
-                        startSlot = i+1;
-                        count = 0;
-                    }
-                    else if(count == duration){
-                        break;
-                    }
-                }
-
-                freeInfoMap.replace("isAllAvailable", false);
-                freeInfoMap.replace("suggestedTime", "From " + Utils.convertTimeSlotToRFC5322(startSlot) +
-                        " to " + Utils.convertTimeSlotToRFC5322(startSlot + duration));
+                available = false;
                 break;
             }
+        }
+
+        if(available){
+            freeInfoMap.put(Configs.IS_ALL_AVAILABLE, true);
+            System.out.println("ALL IS AVAILABLE");
+        }
+        else{
+            int[] timeSlot = getDayFreeBusy(startTime, rawDate, hostEmail, attendeeEmails);
+
+            int duration = Utils.getMeetingDuration(startTime, endTime);
+            int count = 0, startSlot = 0;
+            //(timeSlot.length - duration) is the last available timeSlot within a single day
+            for(int i=0; i < timeSlot.length - duration; i++){
+                if(timeSlot[i] == 1 && count < duration){
+                    count++;
+                }
+                else if(timeSlot[i] != 1 && count < duration){
+                    startSlot = i+1;
+                    count = 0;
+                }
+                else if(count == duration){
+                    break;
+                }
+            }
+
+            freeInfoMap.put(Configs.IS_ALL_AVAILABLE, false);
+//            freeInfoMap.put(Configs.SUGGESTED_START_TIME, "Sorry, the closest available time is from "
+//                    + Utils.convertTimeSlotToRFC5322(startSlot)
+//                    + " to " + Utils.convertTimeSlotToRFC5322(startSlot + duration) + ".");
+            freeInfoMap.put(Configs.SUGGESTED_START_TIME, Utils.convertTimeSlotToRFC5322(startSlot));
+            freeInfoMap.put(Configs.SUGGESTED_END_TIME, Utils.convertTimeSlotToRFC5322(startSlot + duration));
+
+            System.out.println("NOT ALL IS AVAILABLE");
         }
 
         return freeInfoMap;
     }
 
     //get the busy calendar from the specified startTime
-    //endTime is 6pm
+    //endTime is 23:59:59 pm
     private int[] getDayFreeBusy(String startTime,
                                  String rawDate,
                                  String hostEmail,
@@ -106,7 +115,7 @@ public class CalendarServices {
         int[] timeSlot = new int[Configs.TIME_SLOT_NUMBER];
         Arrays.fill(timeSlot,Utils.convertRFC5322ToTimeSlot(startTime), timeSlot.length, 1);
 
-        String endTime = Utils.convertToRFC5322(rawDate, "18:00:00+10:00");
+        String endTime = Utils.convertToRFC5322(rawDate, "23:59:59+10:00");
         FreeBusyResponse response = getFreeBusyResponse(startTime, endTime, hostEmail, attendeeEmails);
 
         for (Map.Entry<String, FreeBusyCalendar> entry : response.getCalendars().entrySet()) {

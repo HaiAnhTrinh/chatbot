@@ -20,6 +20,22 @@ public class Utils {
         return request.getQueryResult().getParameters().getAttendeeEmails();
     }
 
+    static public String getStartTimeFromOutputContexts(Request request){
+        return getTimeFromRFC5322(request.getQueryResult().getOutputContexts()[0].getParameters().getStartTime()[0]);
+    }
+
+    static public String getEndTimeFromOutputContexts(Request request){
+        return getTimeFromRFC5322(request.getQueryResult().getOutputContexts()[0].getParameters().getEndTime()[0]);
+    }
+
+    static public String getDateFromOutputContexts(Request request){
+        return getDateFromRFC5322(request.getQueryResult().getOutputContexts()[0].getParameters().getDate()[0]);
+    }
+
+    static public String[] getAttendeeEmailsFromOutputContexts(Request request){
+        return request.getQueryResult().getOutputContexts()[0].getParameters().getAttendeeEmails();
+    }
+
     static public String convertToRFC5322(String date, String time){
         return date.concat("T").concat(time);
     }
