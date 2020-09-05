@@ -7,6 +7,7 @@ public class Parameters {
     private String[] endTime;
     private String[] attendeeEmails;
     private String[] confirmBoolean;
+    private String eventId;
 
     public String[] getDate() {
         return date;
@@ -34,5 +35,13 @@ public class Parameters {
 
     public String[] getConfirmBoolean() {
         return confirmBoolean;
+    }
+
+    public String getEventId() {
+        return eventId;
+    }
+
+    public void setEventId(String eventId) {
+        this.eventId = eventId;
     }
 }

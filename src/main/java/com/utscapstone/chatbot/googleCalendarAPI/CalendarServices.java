@@ -18,10 +18,8 @@ public class CalendarServices {
         service = new Authorization().getService(userEmail);
     }
 
-    //add an event to GG calendar
+    //add an event to Google calendar
     public void addEvent(String startTime, String endTime, String[] attendeeEmails) throws IOException {
-        System.out.println(startTime);
-        System.out.println(endTime);
         Event event = new Event()
                 .setSummary("This is the summary")
                 .setLocation("Room test")
@@ -54,8 +52,8 @@ public class CalendarServices {
             throws IOException {
 
         boolean available = true;
-        String startTime = Utils.convertToRFC5322(rawDate, rawStartTime);
-        String endTime = Utils.convertToRFC5322(rawDate, rawEndTime);
+        String startTime = Utils.convertToRFC3339(rawDate, rawStartTime);
+        String endTime = Utils.convertToRFC3339(rawDate, rawEndTime);
         Map<String, Object> freeInfoMap = new HashMap<>();
 
         //checks if all attendees are available within the time frame
@@ -92,8 +90,8 @@ public class CalendarServices {
             }
 
             freeInfoMap.put(Configs.IS_ALL_AVAILABLE, false);
-            freeInfoMap.put(Configs.SUGGESTED_START_TIME, Utils.convertTimeSlotToRFC5322(startSlot));
-            freeInfoMap.put(Configs.SUGGESTED_END_TIME, Utils.convertTimeSlotToRFC5322(startSlot + duration));
+            freeInfoMap.put(Configs.SUGGESTED_START_TIME, Utils.convertTimeSlotToRFC3339(startSlot));
+            freeInfoMap.put(Configs.SUGGESTED_END_TIME, Utils.convertTimeSlotToRFC3339(startSlot + duration));
 
             System.out.println("NOT ALL IS AVAILABLE");
         }
@@ -110,16 +108,16 @@ public class CalendarServices {
 
         //time slot array
         int[] timeSlot = new int[Configs.TIME_SLOT_NUMBER];
-        Arrays.fill(timeSlot,Utils.convertRFC5322ToTimeSlot(startTime), timeSlot.length, 1);
+        Arrays.fill(timeSlot,Utils.convertRFC3339ToTimeSlot(startTime), timeSlot.length, 1);
 
-        String endTime = Utils.convertToRFC5322(rawDate, "23:59:59+10:00");
+        String endTime = Utils.convertToRFC3339(rawDate, "23:59:59+10:00");
         FreeBusyResponse response = getFreeBusyResponse(startTime, endTime, hostEmail, attendeeEmails);
 
         for (Map.Entry<String, FreeBusyCalendar> entry : response.getCalendars().entrySet()) {
             //iterate the busy array
             for (TimePeriod busyPeriod : entry.getValue().getBusy()){
-                int startIndex = Utils.convertRFC5322ToTimeSlot(busyPeriod.getStart().toString());
-                int endIndex = Utils.convertRFC5322ToTimeSlot(busyPeriod.getEnd().toString());
+                int startIndex = Utils.convertRFC3339ToTimeSlot(busyPeriod.getStart().toString());
+                int endIndex = Utils.convertRFC3339ToTimeSlot(busyPeriod.getEnd().toString());
                 int[] tempTimeSlot = new int[Configs.TIME_SLOT_NUMBER];
 
                 //the timeslot array will have all slots available by default, value 1 is available
@@ -180,9 +178,9 @@ public class CalendarServices {
         for(Event event : items){
             CardResponseObject.Card.Button button = card.new Button();
             button.setPostback(event.getId());
-            button.setText(Utils.getDateFromRFC5322(event.getStart().getDateTime().toString()).substring(5)
-                    + " (" + Utils.getTimeFromRFC5322(event.getStart().getDateTime().toString()).substring(0,5)
-                    + " to " + Utils.getTimeFromRFC5322(event.getEnd().getDateTime().toString()).substring(0,5) + ")");
+            button.setText(Utils.getDateFromRFC3339(event.getStart().getDateTime().toString()).substring(5)
+                    + " (" + Utils.getTimeFromRFC3339(event.getStart().getDateTime().toString()).substring(0,5)
+                    + " to " + Utils.getTimeFromRFC3339(event.getEnd().getDateTime().toString()).substring(0,5) + ")");
             buttons.add(button);
         }
 
@@ -193,6 +191,44 @@ public class CalendarServices {
     //cancel a meeting
     public void cancelMeeting(String eventId) throws IOException {
         service.events().delete("primary", eventId).execute();
+    }
+
+    //update a meeting
+    public boolean updateMeetingTime(String eventId, String rawDate, String rawStartTime, String rawEndTime) throws IOException {
+
+        Event event = service.events().get("primary", eventId).execute();
+        List<EventAttendee> eventAttendees = event.getAttendees();
+        String[] attendeeEmails = new String[eventAttendees.size()];
+        int index = 0;
+        String newRawDate = rawDate != null ? rawDate : Utils.getDateFromRFC3339(event.getStart().getDateTime().toStringRfc3339());
+        String newRawStartTime = rawStartTime != null ? rawStartTime : Utils.getTimeFromRFC3339(event.getStart().getDateTime().toStringRfc3339());
+        String newRawEndTime = rawEndTime != null ? rawEndTime : Utils.getTimeFromRFC3339(event.getEnd().getDateTime().toStringRfc3339());
+        String organizerEmail = event.getOrganizer().getEmail();
+
+        for(EventAttendee a : eventAttendees){
+            attendeeEmails[index] = a.getEmail();
+        }
+
+        Map<String, Object> freeMap = isAllAvailable(newRawDate, newRawStartTime, newRawEndTime, organizerEmail, attendeeEmails);
+
+        if(Boolean.parseBoolean(freeMap.get(Configs.IS_ALL_AVAILABLE).toString())){
+            DateTime startDateTime = new DateTime(Utils.convertToRFC3339(newRawDate, newRawStartTime));
+            DateTime endDateTime = new DateTime(Utils.convertToRFC3339(newRawDate, newRawEndTime));
+            event.setStart(new EventDateTime().setDateTime(startDateTime));
+            event.setEnd(new EventDateTime().setDateTime(endDateTime));
+
+            service.events().update("primary", eventId, event).execute();
+            System.out.println("EVENT UPDATED");
+            return true;
+        }
+
+        return false;
+    }
+
+    public void updateMeetingTitle(String eventId, String newTitle) throws IOException {
+        Event event = service.events().get("primary", eventId).execute();
+        event.setSummary(newTitle);
+        service.events().update("primary", eventId, event).execute();
     }
 
 }

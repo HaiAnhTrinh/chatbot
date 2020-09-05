@@ -22,5 +22,6 @@ public class Configs {
     public static final String SUGGESTED_END_TIME = "suggestedEndTime";
 
     public static final String PLATFORM_FACEBOOK = "FACEBOOK";
+    public static final String CONTEXT_NAME_PREFIX = "projects/schedulingchatbot-axjpyf/agent/sessions/cc430bfa-e14a-3c7e-83e3-1845850dda7b/contexts/";
 
 }

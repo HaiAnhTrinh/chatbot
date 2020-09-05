@@ -1,6 +1,7 @@
 package com.utscapstone.chatbot.dialogflowAPI;
 
 import com.utscapstone.chatbot.dialogflowAPI.entities.response.CardResponseObject;
+import com.utscapstone.chatbot.dialogflowAPI.entities.response.QuickRepliesResponseObject;
 import com.utscapstone.chatbot.dialogflowAPI.entities.response.ResponseObject;
 import com.utscapstone.chatbot.dialogflowAPI.entities.response.TextResponseObject;
 
@@ -16,6 +17,12 @@ public class AddResponse {
         CardResponseObject cardResponseObject = new CardResponseObject();
         cardResponseObject.setCard(newCard);
         responseObjects.add(cardResponseObject);
+    }
+
+    static public void addQuickRepliesResponse(LinkedList<ResponseObject> responseObjects, QuickRepliesResponseObject.QuickReplies newQuickReplies){
+        QuickRepliesResponseObject quickRepliesResponseObject = new QuickRepliesResponseObject();
+        quickRepliesResponseObject.setQuickReplies(newQuickReplies);
+        responseObjects.add(quickRepliesResponseObject);
     }
 
 }

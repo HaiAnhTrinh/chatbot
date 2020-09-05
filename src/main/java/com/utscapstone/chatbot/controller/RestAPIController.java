@@ -3,10 +3,10 @@ package com.utscapstone.chatbot.controller;
 import com.utscapstone.chatbot.Configs;
 import com.utscapstone.chatbot.Utils;
 import com.utscapstone.chatbot.dialogflowAPI.AddResponse;
+import com.utscapstone.chatbot.dialogflowAPI.DialogflowServices;
 import com.utscapstone.chatbot.dialogflowAPI.ValidateInput;
 import com.utscapstone.chatbot.dialogflowAPI.entities.request.OutputContexts;
 import com.utscapstone.chatbot.dialogflowAPI.entities.request.Request;
-import com.utscapstone.chatbot.dialogflowAPI.entities.response.CardResponseObject;
 import com.utscapstone.chatbot.dialogflowAPI.entities.response.Response;
 import com.utscapstone.chatbot.dialogflowAPI.entities.response.ResponseObject;
 import com.utscapstone.chatbot.googleCalendarAPI.CalendarServices;
@@ -32,7 +32,7 @@ public class RestAPIController {
     public ResponseEntity<Response> processRequest(@RequestBody Request request) throws GeneralSecurityException, IOException {
 
         System.out.println("INTENT: " + request.getQueryResult().getIntent().getDisplayName());
-        System.out.println("originalDetectIntentRequest" + request.getOriginalDetectIntentRequest().getPayload().getData().getSender().getId());
+//        System.out.println("originalDetectIntentRequest" + request.getOriginalDetectIntentRequest().getPayload().getData().getSender().getId());
 
         //follows the hierachy of Dialogflow response structure
         ResponseEntity<Response> response = new ResponseEntity<>(new Response(), HttpStatus.OK);
@@ -47,6 +47,7 @@ public class RestAPIController {
                 String[] attendeeEmails = Utils.getAttendeeEmailsFromRequest(request);
 
                 //check if all params are present
+                //TODO: delete this???
                 String paramsCheck = ValidateInput.missingParams(rawDate, rawStartTime, rawEndTime, attendeeEmails);
                 if(paramsCheck != null ){
                     AddResponse.addTextResponse(responseObjects, paramsCheck);
@@ -66,8 +67,8 @@ public class RestAPIController {
                 else{
                     LinkedList<OutputContexts> outputContexts = new LinkedList<>();
                     OutputContexts outputContext = request.getQueryResult().getOutputContexts().get(0);
-                    outputContext.getParameters().setStartTime(new String[]{Utils.convertToRFC5322(rawDate, freeMap.get(Configs.SUGGESTED_START_TIME).toString())});
-                    outputContext.getParameters().setEndTime(new String[]{Utils.convertToRFC5322(rawDate, freeMap.get(Configs.SUGGESTED_END_TIME).toString())});
+                    outputContext.getParameters().setStartTime(new String[]{Utils.convertToRFC3339(rawDate, freeMap.get(Configs.SUGGESTED_START_TIME).toString())});
+                    outputContext.getParameters().setEndTime(new String[]{Utils.convertToRFC3339(rawDate, freeMap.get(Configs.SUGGESTED_END_TIME).toString())});
                     outputContexts.add(outputContext);
                     Objects.requireNonNull(response.getBody()).setOutputContexts(outputContexts);
 
@@ -87,8 +88,8 @@ public class RestAPIController {
                     //add the event to the calendar
                     String rawDate = Utils.getDateFromOutputContexts(request);
 
-                    String startTime = Utils.convertToRFC5322(rawDate, Utils.getStartTimeFromOutputContexts(request));
-                    String endTime = Utils.convertToRFC5322(rawDate, Utils.getEndTimeFromOutputContexts(request));
+                    String startTime = Utils.convertToRFC3339(rawDate, Utils.getStartTimeFromOutputContexts(request));
+                    String endTime = Utils.convertToRFC3339(rawDate, Utils.getEndTimeFromOutputContexts(request));
                     String[] attendeeEmails = Utils.getAttendeeEmailsFromOutputContexts(request);
 
                     CalendarServices services = new CalendarServices(Configs.USER_EMAIL);
@@ -105,46 +106,65 @@ public class RestAPIController {
             }
             case "Cancel a meeting": {
 
-                //list up to 10 meetings for user to choose
-                CalendarServices services = new CalendarServices(Configs.USER_EMAIL);
-                CardResponseObject.Card card = services.getMeetingInfo();
-
-                if(card.getButtons().isEmpty()){
-                    AddResponse.addTextResponse(responseObjects, "There is no meeting that you can cancel!!!");
-                }
-                else {
-                    card.setTitle("Meetings you can cancel");
-                    AddResponse.addTextResponse(responseObjects, "Which one do you want to cancel?");
-                    AddResponse.addCardResponse(responseObjects, card);
-                }
+                DialogflowServices.showMeetings(responseObjects,
+                        "There is no meeting that you can cancel!!!",
+                        "Meetings you can cancel");
 
                 break;
             }
             case "Cancel a meeting - userChoice": {
                 CalendarServices services = new CalendarServices(Configs.USER_EMAIL);
                 //the queryText is the event id
-                services.cancelMeeting(request.getQueryResult().getQueryText());
+                services.cancelMeeting(request.getQueryResult().getParameters().getEventId());
                 AddResponse.addTextResponse(responseObjects, "Ok I have deleted that meeting for you");
                 break;
             }
             case "View meetings": {
                 //TODO: may want to display the meetings in some other forms?
                 //show event date and time
-                CalendarServices services = new CalendarServices(Configs.USER_EMAIL);
-                CardResponseObject.Card card = services.getMeetingInfo();
-
-                if(card.getButtons().isEmpty()){
-                    AddResponse.addTextResponse(responseObjects, "You have no incoming schedule!!!");
-                }
-                else {
-                    card.setTitle("Your schedule");
-                    AddResponse.addCardResponse(responseObjects, card);
-                }
+                DialogflowServices.showMeetings(responseObjects,
+                        "You have no incoming schedule!!!",
+                        "Your schedule");
                 break;
             }
             case "Update a meeting": {
-                //idk ...
+                //shows incoming meetings
+                DialogflowServices.showMeetings(responseObjects,
+                        "You have no incoming schedule!!!",
+                        "Choose which one to update");
+                break;
+            }
+            case "Update a meeting - DateTime - GetInfo": {
                 CalendarServices services = new CalendarServices(Configs.USER_EMAIL);
+                String rawDate = Utils.getDateFromRequest(request);
+                String rawStartTime = Utils.getStartTimeFromRequest(request);
+                String rawEndTime = Utils.getEndTimeFromRequest(request);
+                String eventId = "";
+
+                for(OutputContexts o : request.getQueryResult().getOutputContexts()){
+                    if(o.getName().equals(Configs.CONTEXT_NAME_PREFIX + "updateameeting-eventchosen-followup")){
+                        eventId = o.getParameters().getEventId();
+                    }
+                }
+
+                if(services.updateMeetingTime(eventId, rawDate, rawStartTime, rawEndTime)){
+                    AddResponse.addTextResponse(responseObjects, "The meeting time has been updated");
+                }
+                break;
+            }
+            case "Update a meeting - Title - GetInfo": {
+                CalendarServices services = new CalendarServices(Configs.USER_EMAIL);
+                String title = request.getQueryResult().getQueryText();
+                String eventId = "";
+                for(OutputContexts o : request.getQueryResult().getOutputContexts()){
+                    if(o.getName().equals(Configs.CONTEXT_NAME_PREFIX + "updateameeting-eventchosen-followup")){
+                        eventId = o.getParameters().getEventId();
+                    }
+                }
+
+                services.updateMeetingTitle(eventId, title);
+                AddResponse.addTextResponse(responseObjects, "The meeting title has been updated");
+
                 break;
             }
             default:
