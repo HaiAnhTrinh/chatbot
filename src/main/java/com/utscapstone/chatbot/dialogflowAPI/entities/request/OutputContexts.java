@@ -1,4 +1,4 @@
-package com.utscapstone.chatbot.entities.request;
+package com.utscapstone.chatbot.dialogflowAPI.entities.request;
 
 public class OutputContexts {
     private Parameters parameters = new Parameters();

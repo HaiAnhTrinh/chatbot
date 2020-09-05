@@ -1,4 +1,4 @@
-package com.utscapstone.chatbot.entities.request;
+package com.utscapstone.chatbot.dialogflowAPI.entities.request;
 
 public class Parameters {
 
@@ -10,10 +10,6 @@ public class Parameters {
 
     public String[] getDate() {
         return date;
-    }
-
-    public void setDate(String[] date) {
-        this.date = date;
     }
 
     public String[] getStartTime() {
@@ -36,15 +32,7 @@ public class Parameters {
         return attendeeEmails;
     }
 
-    public void setAttendeeEmails(String[] attendeeEmails) {
-        this.attendeeEmails = attendeeEmails;
-    }
-
     public String[] getConfirmBoolean() {
         return confirmBoolean;
-    }
-
-    public void setConfirmBoolean(String[] confirmBoolean) {
-        this.confirmBoolean = confirmBoolean;
     }
 }

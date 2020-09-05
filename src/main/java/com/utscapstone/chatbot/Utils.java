@@ -1,39 +1,51 @@
-package com.utscapstone.chatbot.googleCalendarAPI;
+package com.utscapstone.chatbot;
 
-import com.utscapstone.chatbot.entities.request.Request;
+import com.utscapstone.chatbot.dialogflowAPI.entities.request.Request;
 
 public class Utils {
 
     static public String getStartTimeFromRequest(Request request){
-        return getTimeFromRFC5322(request.getQueryResult().getParameters().getStartTime()[0]);
+        if(request.getQueryResult().getParameters().getStartTime().length > 0){
+            return getTimeFromRFC5322(request.getQueryResult().getParameters().getStartTime()[0]);
+        }
+        return null;
     }
 
     static public String getEndTimeFromRequest(Request request){
-        return getTimeFromRFC5322(request.getQueryResult().getParameters().getEndTime()[0]);
+        if(request.getQueryResult().getParameters().getEndTime().length > 0){
+            return getTimeFromRFC5322(request.getQueryResult().getParameters().getEndTime()[0]);
+        }
+        return null;
     }
 
     static public String getDateFromRequest(Request request){
-        return getDateFromRFC5322(request.getQueryResult().getParameters().getDate()[0]);
+        if(request.getQueryResult().getParameters().getDate().length > 0){
+            return getDateFromRFC5322(request.getQueryResult().getParameters().getDate()[0]);
+        }
+        return null;
     }
 
     static public String[] getAttendeeEmailsFromRequest(Request request){
-        return request.getQueryResult().getParameters().getAttendeeEmails();
+        if(request.getQueryResult().getParameters().getAttendeeEmails().length > 0){
+            return request.getQueryResult().getParameters().getAttendeeEmails();
+        }
+        return null;
     }
 
     static public String getStartTimeFromOutputContexts(Request request){
-        return getTimeFromRFC5322(request.getQueryResult().getOutputContexts()[0].getParameters().getStartTime()[0]);
+        return getTimeFromRFC5322(request.getQueryResult().getOutputContexts().getFirst().getParameters().getStartTime()[0]);
     }
 
     static public String getEndTimeFromOutputContexts(Request request){
-        return getTimeFromRFC5322(request.getQueryResult().getOutputContexts()[0].getParameters().getEndTime()[0]);
+        return getTimeFromRFC5322(request.getQueryResult().getOutputContexts().getFirst().getParameters().getEndTime()[0]);
     }
 
     static public String getDateFromOutputContexts(Request request){
-        return getDateFromRFC5322(request.getQueryResult().getOutputContexts()[0].getParameters().getDate()[0]);
+        return getDateFromRFC5322(request.getQueryResult().getOutputContexts().getFirst().getParameters().getDate()[0]);
     }
 
     static public String[] getAttendeeEmailsFromOutputContexts(Request request){
-        return request.getQueryResult().getOutputContexts()[0].getParameters().getAttendeeEmails();
+        return request.getQueryResult().getOutputContexts().getFirst().getParameters().getAttendeeEmails();
     }
 
     static public String convertToRFC5322(String date, String time){

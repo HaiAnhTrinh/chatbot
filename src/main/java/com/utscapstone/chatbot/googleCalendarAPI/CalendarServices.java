@@ -4,12 +4,12 @@ import com.google.api.client.util.DateTime;
 import com.google.api.services.calendar.Calendar;
 import com.google.api.services.calendar.model.*;
 import com.utscapstone.chatbot.Configs;
+import com.utscapstone.chatbot.Utils;
+import com.utscapstone.chatbot.dialogflowAPI.entities.response.CardResponseObject;
 
 import java.io.IOException;
 import java.security.GeneralSecurityException;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 public class CalendarServices {
     Calendar service;
@@ -92,9 +92,6 @@ public class CalendarServices {
             }
 
             freeInfoMap.put(Configs.IS_ALL_AVAILABLE, false);
-//            freeInfoMap.put(Configs.SUGGESTED_START_TIME, "Sorry, the closest available time is from "
-//                    + Utils.convertTimeSlotToRFC5322(startSlot)
-//                    + " to " + Utils.convertTimeSlotToRFC5322(startSlot + duration) + ".");
             freeInfoMap.put(Configs.SUGGESTED_START_TIME, Utils.convertTimeSlotToRFC5322(startSlot));
             freeInfoMap.put(Configs.SUGGESTED_END_TIME, Utils.convertTimeSlotToRFC5322(startSlot + duration));
 
@@ -124,8 +121,12 @@ public class CalendarServices {
                 int startIndex = Utils.convertRFC5322ToTimeSlot(busyPeriod.getStart().toString());
                 int endIndex = Utils.convertRFC5322ToTimeSlot(busyPeriod.getEnd().toString());
                 int[] tempTimeSlot = new int[Configs.TIME_SLOT_NUMBER];
+
+                //the timeslot array will have all slots available by default, value 1 is available
                 Arrays.fill(tempTimeSlot, 1);
+                //fill in the unavailable slots
                 Arrays.fill(tempTimeSlot, startIndex, endIndex, 0);
+                //merge with the main array
                 for(int i=0; i< timeSlot.length; i++){
                     timeSlot[i] = timeSlot[i] * tempTimeSlot[i];
                 }
@@ -158,6 +159,40 @@ public class CalendarServices {
         freeBusyRequest.setItems(Arrays.asList(freeBusyRequestItems));
 
         return service.freebusy().query(freeBusyRequest).execute();
+    }
+
+    //retrieve meeting info
+    public CardResponseObject.Card getMeetingInfo() throws IOException {
+
+        CardResponseObject cardResponseObject = new CardResponseObject();
+        CardResponseObject.Card card = cardResponseObject.new Card();
+        LinkedList<CardResponseObject.Card.Button> buttons = new LinkedList<>();
+
+        Events events = service.events()
+                .list("primary")
+                .setTimeMin(new DateTime(System.currentTimeMillis()))
+                .setMaxResults(10)
+                .setSingleEvents(true)
+                .setOrderBy("startTime")
+                .execute();
+        List<Event> items = events.getItems();
+
+        for(Event event : items){
+            CardResponseObject.Card.Button button = card.new Button();
+            button.setPostback(event.getId());
+            button.setText(Utils.getDateFromRFC5322(event.getStart().getDateTime().toString()).substring(5)
+                    + " (" + Utils.getTimeFromRFC5322(event.getStart().getDateTime().toString()).substring(0,5)
+                    + " to " + Utils.getTimeFromRFC5322(event.getEnd().getDateTime().toString()).substring(0,5) + ")");
+            buttons.add(button);
+        }
+
+        card.setButtons(buttons);
+        return card;
+    }
+
+    //cancel a meeting
+    public void cancelMeeting(String eventId) throws IOException {
+        service.events().delete("primary", eventId).execute();
     }
 
 }
