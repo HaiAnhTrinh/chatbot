@@ -10,12 +10,13 @@ import com.utscapstone.chatbot.dialogflowAPI.entities.request.Request;
 import com.utscapstone.chatbot.dialogflowAPI.entities.response.Response;
 import com.utscapstone.chatbot.dialogflowAPI.entities.response.ResponseObject;
 import com.utscapstone.chatbot.googleCalendarAPI.CalendarServices;
+import com.utscapstone.chatbot.jdbc.repository.RoomRepository;
+
+import com.utscapstone.chatbot.jdbc.repository.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
 import java.security.GeneralSecurityException;
@@ -27,12 +28,38 @@ import java.util.Objects;
 @RestController
 public class RestAPIController {
 
+    final JdbcTemplate jdbcTemplate;
+
+    //explicitly instantiate jdbcTemplate instead of @Autowire
+    //to avoid strange behaviours from not being able to auto configure jdbc
+    public RestAPIController(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
+    @CrossOrigin(origins = "*")
+    @GetMapping("/getRoomData")
+    public void getRoomData(){
+        RoomRepository repository = new RoomRepository(jdbcTemplate);
+        repository.count();
+    }
+
+    @CrossOrigin(origins = "*")
+    @GetMapping("/getUserData")
+    public void getUserData(){
+        UserRepository repository = new UserRepository(jdbcTemplate);
+        System.out.println("email: " + repository.getEmailFromFacebookId("100001379055166"));
+    }
+
     @CrossOrigin(origins = "*")
     @PostMapping("/")
     public ResponseEntity<Response> processRequest(@RequestBody Request request) throws GeneralSecurityException, IOException {
 
         System.out.println("INTENT: " + request.getQueryResult().getIntent().getDisplayName());
-//        System.out.println("originalDetectIntentRequest" + request.getOriginalDetectIntentRequest().getPayload().getData().getSender().getId());
+        UserRepository userRepository = new UserRepository(jdbcTemplate);
+        RoomRepository roomRepository = new RoomRepository(jdbcTemplate);
+        String facebookId = request.getOriginalDetectIntentRequest().getPayload().getData().getSender().getId();
+        String email = userRepository.getEmailFromFacebookId(facebookId);
+
 
         //follows the hierachy of Dialogflow response structure
         ResponseEntity<Response> response = new ResponseEntity<>(new Response(), HttpStatus.OK);
@@ -54,9 +81,9 @@ public class RestAPIController {
                     break;
                 }
 
-                CalendarServices services = new CalendarServices(Configs.USER_EMAIL);
+                CalendarServices services = new CalendarServices(email);
                 Map<String, Object> freeMap = services.isAllAvailable(rawDate,
-                        rawStartTime, rawEndTime,Configs.USER_EMAIL, attendeeEmails);
+                        rawStartTime, rawEndTime,email, attendeeEmails);
 
                 //check the availability of all attendees (primary calendar)
                 //if invalid, look for the most recent available time slot
@@ -92,7 +119,7 @@ public class RestAPIController {
                     String endTime = Utils.convertToRFC3339(rawDate, Utils.getEndTimeFromOutputContexts(request));
                     String[] attendeeEmails = Utils.getAttendeeEmailsFromOutputContexts(request);
 
-                    CalendarServices services = new CalendarServices(Configs.USER_EMAIL);
+                    CalendarServices services = new CalendarServices(email);
                     services.addEvent(startTime, endTime, attendeeEmails);
                     AddResponse.addTextResponse(responseObjects,"Ok, the meeting has been successfully booked.");
                     //TODO: update room database
@@ -105,65 +132,69 @@ public class RestAPIController {
 
             }
             case "Cancel a meeting": {
-
-                DialogflowServices.showMeetings(responseObjects,
+                DialogflowServices.showMeetings(responseObjects, email,
+                        Configs.VIEW_AUTHORIZED_MEETING,
                         "There is no meeting that you can cancel!!!",
                         "Meetings you can cancel");
-
                 break;
             }
             case "Cancel a meeting - userChoice": {
-                CalendarServices services = new CalendarServices(Configs.USER_EMAIL);
+                CalendarServices services = new CalendarServices(email);
                 //the queryText is the event id
                 services.cancelMeeting(request.getQueryResult().getParameters().getEventId());
                 AddResponse.addTextResponse(responseObjects, "Ok I have deleted that meeting for you");
                 break;
             }
             case "View meetings": {
-                //TODO: may want to display the meetings in some other forms?
                 //show event date and time
-                DialogflowServices.showMeetings(responseObjects,
+                DialogflowServices.showMeetings(responseObjects, email,
+                        Configs.VIEW_ALL_MEETING,
                         "You have no incoming schedule!!!",
                         "Your schedule");
                 break;
             }
             case "Update a meeting": {
                 //shows incoming meetings
-                DialogflowServices.showMeetings(responseObjects,
+                DialogflowServices.showMeetings(responseObjects, email,
+                        Configs.VIEW_AUTHORIZED_MEETING,
                         "You have no incoming schedule!!!",
                         "Choose which one to update");
                 break;
             }
             case "Update a meeting - DateTime - GetInfo": {
-                CalendarServices services = new CalendarServices(Configs.USER_EMAIL);
+                CalendarServices services = new CalendarServices(email);
                 String rawDate = Utils.getDateFromRequest(request);
                 String rawStartTime = Utils.getStartTimeFromRequest(request);
                 String rawEndTime = Utils.getEndTimeFromRequest(request);
-                String eventId = "";
+                String eventId = DialogflowServices.getEventIdFromOutputContext(request);
+                System.out.println("EVENT ID: " + eventId);
 
-                for(OutputContexts o : request.getQueryResult().getOutputContexts()){
-                    if(o.getName().equals(Configs.CONTEXT_NAME_PREFIX + "updateameeting-eventchosen-followup")){
-                        eventId = o.getParameters().getEventId();
+                if(eventId != null){
+                    if(services.updateMeetingTime(eventId, rawDate, rawStartTime, rawEndTime)){
+                        AddResponse.addTextResponse(responseObjects, "The meeting time has been updated");
+                    }
+                    else {
+                        AddResponse.addTextResponse(responseObjects, "The new time is conflicting with others availibility");
                     }
                 }
-
-                if(services.updateMeetingTime(eventId, rawDate, rawStartTime, rawEndTime)){
-                    AddResponse.addTextResponse(responseObjects, "The meeting time has been updated");
+                else {
+                    AddResponse.addTextResponse(responseObjects, Configs.ERROR_MESSAGE);
                 }
+
                 break;
             }
             case "Update a meeting - Title - GetInfo": {
-                CalendarServices services = new CalendarServices(Configs.USER_EMAIL);
+                CalendarServices services = new CalendarServices(email);
                 String title = request.getQueryResult().getQueryText();
-                String eventId = "";
-                for(OutputContexts o : request.getQueryResult().getOutputContexts()){
-                    if(o.getName().equals(Configs.CONTEXT_NAME_PREFIX + "updateameeting-eventchosen-followup")){
-                        eventId = o.getParameters().getEventId();
-                    }
-                }
+                String eventId = DialogflowServices.getEventIdFromOutputContext(request);
 
-                services.updateMeetingTitle(eventId, title);
-                AddResponse.addTextResponse(responseObjects, "The meeting title has been updated");
+                if(eventId != null){
+                    services.updateMeetingTitle(eventId, title);
+                    AddResponse.addTextResponse(responseObjects, "The meeting title has been updated");
+                }
+                else {
+                    AddResponse.addTextResponse(responseObjects, Configs.ERROR_MESSAGE);
+                }
 
                 break;
             }

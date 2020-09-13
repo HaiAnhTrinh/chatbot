@@ -13,9 +13,11 @@ import java.util.*;
 
 public class CalendarServices {
     Calendar service;
+    String userEmail;
 
     public CalendarServices(String userEmail) throws GeneralSecurityException, IOException {
         service = new Authorization().getService(userEmail);
+        this.userEmail = userEmail;
     }
 
     //add an event to Google calendar
@@ -24,21 +26,18 @@ public class CalendarServices {
                 .setSummary("This is the summary")
                 .setLocation("Room test")
                 .setDescription("This is a description");
-
         DateTime startDateTime = new DateTime(startTime);
-        event.setStart(new EventDateTime().setDateTime(startDateTime));
-
         DateTime endDateTime = new DateTime(endTime);
-        event.setEnd(new EventDateTime().setDateTime(endDateTime));
-
         EventAttendee[] attendees = new EventAttendee[attendeeEmails.length];
         for(int i=0; i < attendeeEmails.length; i++){
             attendees[i] = new EventAttendee().setEmail(attendeeEmails[i]);
         }
+
+        event.setStart(new EventDateTime().setDateTime(startDateTime));
+        event.setEnd(new EventDateTime().setDateTime(endDateTime));
         event.setAttendees(Arrays.asList(attendees));
 
-        String calendarId = "primary";
-        service.events().insert(calendarId, event).execute();
+        service.events().insert(Configs.PRIMARY_CALENDAR, event).execute();
     }
 
     //checks all attendees' availability
@@ -160,14 +159,14 @@ public class CalendarServices {
     }
 
     //retrieve meeting info
-    public CardResponseObject.Card getMeetingInfo() throws IOException {
+    public CardResponseObject.Card getMeetingInfo(String viewType) throws IOException {
 
         CardResponseObject cardResponseObject = new CardResponseObject();
         CardResponseObject.Card card = cardResponseObject.new Card();
         LinkedList<CardResponseObject.Card.Button> buttons = new LinkedList<>();
 
         Events events = service.events()
-                .list("primary")
+                .list(Configs.PRIMARY_CALENDAR)
                 .setTimeMin(new DateTime(System.currentTimeMillis()))
                 .setMaxResults(10)
                 .setSingleEvents(true)
@@ -181,7 +180,14 @@ public class CalendarServices {
             button.setText(Utils.getDateFromRFC3339(event.getStart().getDateTime().toString()).substring(5)
                     + " (" + Utils.getTimeFromRFC3339(event.getStart().getDateTime().toString()).substring(0,5)
                     + " to " + Utils.getTimeFromRFC3339(event.getEnd().getDateTime().toString()).substring(0,5) + ")");
-            buttons.add(button);
+            if(viewType.equals(Configs.VIEW_AUTHORIZED_MEETING)){
+                if(event.getOrganizer().getEmail().equals(userEmail)){
+                    buttons.add(button);
+                }
+            }
+            else {
+                buttons.add(button);
+            }
         }
 
         card.setButtons(buttons);
@@ -190,34 +196,43 @@ public class CalendarServices {
 
     //cancel a meeting
     public void cancelMeeting(String eventId) throws IOException {
-        service.events().delete("primary", eventId).execute();
+        service.events().delete(Configs.PRIMARY_CALENDAR, eventId).execute();
     }
 
     //update a meeting
     public boolean updateMeetingTime(String eventId, String rawDate, String rawStartTime, String rawEndTime) throws IOException {
 
-        Event event = service.events().get("primary", eventId).execute();
+        Event event = service.events().get(Configs.PRIMARY_CALENDAR, eventId).execute();
+
+        //temporary delete the meeting for availability checking
+        cancelMeeting(eventId);
+
         List<EventAttendee> eventAttendees = event.getAttendees();
-        String[] attendeeEmails = new String[eventAttendees.size()];
+        String[] attendeeEmails = new String[eventAttendees != null ? eventAttendees.size() : 0];
         int index = 0;
-        String newRawDate = rawDate != null ? rawDate : Utils.getDateFromRFC3339(event.getStart().getDateTime().toStringRfc3339());
-        String newRawStartTime = rawStartTime != null ? rawStartTime : Utils.getTimeFromRFC3339(event.getStart().getDateTime().toStringRfc3339());
-        String newRawEndTime = rawEndTime != null ? rawEndTime : Utils.getTimeFromRFC3339(event.getEnd().getDateTime().toStringRfc3339());
+        String newRawDate = (rawDate != null) ? rawDate : Utils.getDateFromRFC3339(event.getStart().getDateTime().toStringRfc3339());
+        String newRawStartTime = (rawStartTime != null) ? rawStartTime : Utils.getTimeFromRFC3339(event.getStart().getDateTime().toStringRfc3339());
+        String newRawEndTime = (rawEndTime != null) ? rawEndTime : Utils.getTimeFromRFC3339(event.getEnd().getDateTime().toStringRfc3339());
         String organizerEmail = event.getOrganizer().getEmail();
 
-        for(EventAttendee a : eventAttendees){
-            attendeeEmails[index] = a.getEmail();
+        if(eventAttendees != null){
+            for(EventAttendee a : eventAttendees){
+                attendeeEmails[index] = a.getEmail();
+            }
         }
 
         Map<String, Object> freeMap = isAllAvailable(newRawDate, newRawStartTime, newRawEndTime, organizerEmail, attendeeEmails);
+        boolean check = Boolean.parseBoolean(freeMap.get(Configs.IS_ALL_AVAILABLE).toString());
+        //reimport the deleted event
+        service.events().calendarImport(Configs.PRIMARY_CALENDAR, event).execute();
 
-        if(Boolean.parseBoolean(freeMap.get(Configs.IS_ALL_AVAILABLE).toString())){
+        if(check){
             DateTime startDateTime = new DateTime(Utils.convertToRFC3339(newRawDate, newRawStartTime));
             DateTime endDateTime = new DateTime(Utils.convertToRFC3339(newRawDate, newRawEndTime));
             event.setStart(new EventDateTime().setDateTime(startDateTime));
             event.setEnd(new EventDateTime().setDateTime(endDateTime));
 
-            service.events().update("primary", eventId, event).execute();
+            service.events().update(Configs.PRIMARY_CALENDAR, eventId, event).execute();
             System.out.println("EVENT UPDATED");
             return true;
         }
@@ -226,9 +241,9 @@ public class CalendarServices {
     }
 
     public void updateMeetingTitle(String eventId, String newTitle) throws IOException {
-        Event event = service.events().get("primary", eventId).execute();
+        Event event = service.events().get(Configs.PRIMARY_CALENDAR, eventId).execute();
         event.setSummary(newTitle);
-        service.events().update("primary", eventId, event).execute();
+        service.events().update(Configs.PRIMARY_CALENDAR, eventId, event).execute();
     }
 
 }
