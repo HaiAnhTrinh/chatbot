@@ -15,8 +15,9 @@ public class UserRowMapper implements RowMapper<User> {
 
         user.setEmail(rs.getString("EMAIL"));
         user.setFacebookId(rs.getString("FB_ID"));
-        user.setFirstName(rs.getString("FIRST_NAME"));
-        user.setFirstName(rs.getString("LAST_NAME"));
+        user.setGivenName(rs.getString("GIVEN_NAME"));
+        user.setGivenName(rs.getString("LAST_NAME"));
+        user.setIndicator(rs.getInt("INDICATOR"));
 
         return user;
     }

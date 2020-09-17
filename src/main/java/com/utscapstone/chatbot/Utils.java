@@ -2,6 +2,9 @@ package com.utscapstone.chatbot;
 
 import com.utscapstone.chatbot.dialogflowAPI.entities.request.Request;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 public class Utils {
 
     static public String getStartTimeFromRequest(Request request){
@@ -25,11 +28,15 @@ public class Utils {
         return null;
     }
 
-    static public String[] getAttendeeEmailsFromRequest(Request request){
-        if(request.getQueryResult().getParameters().getAttendeeEmails().length > 0){
-            return request.getQueryResult().getParameters().getAttendeeEmails();
+    static public String[] getAttendeeNamesFromRequest(Request request){
+        if(request.getQueryResult().getParameters().getAttendeeNames().length > 0){
+            return request.getQueryResult().getParameters().getAttendeeNames();
         }
         return null;
+    }
+
+    static public String getLocationFromRequest(Request request){
+        return request.getQueryResult().getParameters().getLocation();
     }
 
     static public String getStartTimeFromOutputContexts(Request request){
@@ -44,8 +51,16 @@ public class Utils {
         return getDateFromRFC3339(request.getQueryResult().getOutputContexts().getFirst().getParameters().getDate()[0]);
     }
 
-    static public String[] getAttendeeEmailsFromOutputContexts(Request request){
-        return request.getQueryResult().getOutputContexts().getFirst().getParameters().getAttendeeEmails();
+    static public String[] getAttendeeNamesFromOutputContexts(Request request){
+        return request.getQueryResult().getOutputContexts().getFirst().getParameters().getAttendeeNames();
+    }
+
+    static public String getLocationFromOutputContexts(Request request){
+        return request.getQueryResult().getOutputContexts().getFirst().getParameters().getLocation();
+    }
+
+    static public String getTitleFromOutputContexts(Request request){
+        return request.getQueryResult().getOutputContexts().getFirst().getParameters().getTitle();
     }
 
     static public String convertToRFC3339(String date, String time){
@@ -83,5 +98,11 @@ public class Utils {
 
     static public int getMeetingDuration(String startTime, String endTime){
         return convertRFC3339ToTimeSlot(endTime) - convertRFC3339ToTimeSlot(startTime);
+    }
+
+    static public boolean hasDigit(String anyString){
+        Pattern pattern = Pattern.compile("[0-9]");
+        Matcher matcher = pattern.matcher(anyString);
+        return matcher.find();
     }
 }

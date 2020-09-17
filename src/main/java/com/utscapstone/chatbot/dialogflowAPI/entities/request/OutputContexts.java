@@ -1,7 +1,7 @@
 package com.utscapstone.chatbot.dialogflowAPI.entities.request;
 
 public class OutputContexts {
-    private Parameters parameters = new Parameters();
+    private final Parameters parameters = new Parameters();
     private String name;
     private int lifespanCount;
 

@@ -4,8 +4,9 @@ public class User {
 
     private String facebookId;
     private String email;
-    private String firstName;
+    private String givenName;
     private String lastName;
+    private int indicator;
 
     public User() {
     }
@@ -26,12 +27,12 @@ public class User {
         this.email = email;
     }
 
-    public String getFirstName() {
-        return firstName;
+    public String getGivenName() {
+        return givenName;
     }
 
-    public void setFirstName(String firstName) {
-        this.firstName = firstName;
+    public void setGivenName(String givenName) {
+        this.givenName = givenName;
     }
 
     public String getLastName() {
@@ -40,5 +41,13 @@ public class User {
 
     public void setLastName(String lastName) {
         this.lastName = lastName;
+    }
+
+    public int getIndicator() {
+        return indicator;
+    }
+
+    public void setIndicator(int indicator) {
+        this.indicator = indicator;
     }
 }

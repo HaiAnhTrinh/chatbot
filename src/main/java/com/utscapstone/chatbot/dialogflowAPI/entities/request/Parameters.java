@@ -5,9 +5,11 @@ public class Parameters {
     private String[] date;
     private String[] startTime;
     private String[] endTime;
-    private String[] attendeeEmails;
+    private String[] attendeeNames;
     private String[] confirmBoolean;
     private String eventId;
+    private String location;
+    private String title;
 
     public String[] getDate() {
         return date;
@@ -29,8 +31,8 @@ public class Parameters {
         this.endTime = endTime;
     }
 
-    public String[] getAttendeeEmails() {
-        return attendeeEmails;
+    public String[] getAttendeeNames() {
+        return attendeeNames;
     }
 
     public String[] getConfirmBoolean() {
@@ -43,5 +45,21 @@ public class Parameters {
 
     public void setEventId(String eventId) {
         this.eventId = eventId;
+    }
+
+    public String getLocation() {
+        return location;
+    }
+
+    public void setLocation(String location) {
+        this.location = location;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
     }
 }

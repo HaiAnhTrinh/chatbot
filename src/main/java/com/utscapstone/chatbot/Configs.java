@@ -26,4 +26,8 @@ public class Configs {
     public static final String PLATFORM_FACEBOOK = "FACEBOOK";
     public static final String CONTEXT_NAME_PREFIX = "projects/schedulingchatbot-axjpyf/agent/sessions/cc430bfa-e14a-3c7e-83e3-1845850dda7b/contexts/";
     public static final String ERROR_MESSAGE = "There is something wrong with the system";
+
+    //DB
+    public static final String UPDATE_DETELE = "delete";
+    public static final String UPDATE_INSERT = "insert";
 }

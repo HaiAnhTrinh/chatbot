@@ -6,6 +6,7 @@ import com.google.api.services.calendar.model.*;
 import com.utscapstone.chatbot.Configs;
 import com.utscapstone.chatbot.Utils;
 import com.utscapstone.chatbot.dialogflowAPI.entities.response.CardResponseObject;
+import com.utscapstone.chatbot.jdbc.repository.RoomAvailabilityRepository;
 
 import java.io.IOException;
 import java.security.GeneralSecurityException;
@@ -21,11 +22,11 @@ public class CalendarServices {
     }
 
     //add an event to Google calendar
-    public void addEvent(String startTime, String endTime, String[] attendeeEmails) throws IOException {
+    public void addEvent(String startTime, String endTime, String[] attendeeEmails, String location, String title) throws IOException {
         Event event = new Event()
-                .setSummary("This is the summary")
-                .setLocation("Room test")
-                .setDescription("This is a description");
+                .setSummary(title)
+                .setLocation(location)
+                .setDescription("Default description");
         DateTime startDateTime = new DateTime(startTime);
         DateTime endDateTime = new DateTime(endTime);
         EventAttendee[] attendees = new EventAttendee[attendeeEmails.length];
@@ -195,8 +196,15 @@ public class CalendarServices {
     }
 
     //cancel a meeting
-    public void cancelMeeting(String eventId) throws IOException {
+    public void cancelMeeting(String eventId, RoomAvailabilityRepository repository) throws IOException {
         service.events().delete(Configs.PRIMARY_CALENDAR, eventId).execute();
+        Event event = service.events().get(Configs.PRIMARY_CALENDAR, eventId).execute();
+
+        repository.updateAvailability(event.getLocation(),
+                Utils.getTimeFromRFC3339(event.getStart().getDateTime().toString()),
+                Utils.getTimeFromRFC3339(event.getEnd().getDateTime().toString()),
+                Utils.getDateFromRFC3339(event.getStart().getDateTime().toString()),
+                Configs.UPDATE_DETELE);
     }
 
     //update a meeting
@@ -205,7 +213,7 @@ public class CalendarServices {
         Event event = service.events().get(Configs.PRIMARY_CALENDAR, eventId).execute();
 
         //temporary delete the meeting for availability checking
-        cancelMeeting(eventId);
+        service.events().delete(Configs.PRIMARY_CALENDAR, eventId).execute();
 
         List<EventAttendee> eventAttendees = event.getAttendees();
         String[] attendeeEmails = new String[eventAttendees != null ? eventAttendees.size() : 0];
