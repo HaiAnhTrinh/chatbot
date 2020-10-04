@@ -41,6 +41,7 @@ public class Authorization {
                 .setAccessType("offline")
                 .build();
         LocalServerReceiver receiver = new LocalServerReceiver.Builder().setPort(8888).build();
+
         return new AuthorizationCodeInstalledApp(flow, receiver).authorize(userEmail);
     }
 
@@ -51,5 +52,4 @@ public class Authorization {
                 .setApplicationName(Configs.APPLICATION_NAME)
                 .build();
     }
-
 }

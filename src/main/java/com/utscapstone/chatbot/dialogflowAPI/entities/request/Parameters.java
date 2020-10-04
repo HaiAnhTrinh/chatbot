@@ -10,6 +10,9 @@ public class Parameters {
     private String eventId;
     private String location;
     private String title;
+    private String[] removeNames;
+    private String[] addNames;
+    private String userEmail;
 
     public String[] getDate() {
         return date;
@@ -61,5 +64,17 @@ public class Parameters {
 
     public void setTitle(String title) {
         this.title = title;
+    }
+
+    public String[] getRemoveNames() {
+        return removeNames;
+    }
+
+    public String[] getAddNames() {
+        return addNames;
+    }
+
+    public String getUserEmail() {
+        return userEmail;
     }
 }

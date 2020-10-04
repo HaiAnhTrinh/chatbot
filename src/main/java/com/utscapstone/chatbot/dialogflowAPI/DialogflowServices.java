@@ -1,6 +1,5 @@
 package com.utscapstone.chatbot.dialogflowAPI;
 
-import com.utscapstone.chatbot.Configs;
 import com.utscapstone.chatbot.dialogflowAPI.entities.request.OutputContexts;
 import com.utscapstone.chatbot.dialogflowAPI.entities.request.Request;
 import com.utscapstone.chatbot.dialogflowAPI.entities.response.CardResponseObject;
@@ -12,7 +11,6 @@ import com.utscapstone.chatbot.googleCalendarAPI.CalendarServices;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.util.LinkedList;
-import java.util.Objects;
 
 public class DialogflowServices {
 
@@ -46,15 +44,6 @@ public class DialogflowServices {
             addCardResponse(responseObjects, card);
             return false;
         }
-    }
-
-    public static String getEventIdFromOutputContext(Request request){
-        for(OutputContexts o : request.getQueryResult().getOutputContexts()){
-            if(o.getName().equals(Configs.CONTEXT_NAME_PREFIX + "updateameeting-eventchosen-followup")){
-                return o.getParameters().getEventId();
-            }
-        }
-        return null;
     }
 
     public static LinkedList<OutputContexts> resetContext(Request request){

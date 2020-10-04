@@ -4,6 +4,7 @@ import com.utscapstone.chatbot.Utils;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.sql.ResultSet;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
@@ -15,6 +16,19 @@ public class UserRepository {
 
     public UserRepository(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
+    }
+
+    public Boolean hasFacebookId(String id){
+        return jdbcTemplate.query("select * from USER where FB_ID = ?", new Object[]{id}, ResultSet::first);
+    }
+
+    public Boolean hasEmail(String email){
+        return jdbcTemplate.query("select * from USER where EMAIL = ?", new Object[]{email}, ResultSet::first);
+    }
+
+    public void addNewFacebookId(String id, String email){
+        String query = "update USER set FB_ID = ? where EMAIL = ?";
+        jdbcTemplate.update(query, id, email);
     }
 
     public String getEmailFromFacebookId(String id){
@@ -30,7 +44,6 @@ public class UserRepository {
     }
 
     public String getEmailFromName(String name){
-
         String[] nameArray = name.split(" ");
         int indicator = Utils.hasDigit(name) ? Integer.parseInt(nameArray[nameArray.length-1]) : 0;
         String lastName = Utils.hasDigit(name) ? nameArray[nameArray.length-2] : nameArray[nameArray.length-1];
@@ -72,11 +85,25 @@ public class UserRepository {
             }
         }
 
-
         resultMap.put("hasUnknown", new String[]{String.valueOf(hasUnknown)});
         resultMap.put("resultArray", hasUnknown ? unknowns.toArray(new String[0]) : emails.toArray(new String[0]));
-
         return resultMap;
+    }
+
+    public String getNameFromEmail(String email){
+
+        return jdbcTemplate.query("select * from USER where EMAIL = ?", new Object[]{email}, resultSet -> {
+            if(resultSet.next()){
+                String givenName = resultSet.getString("GIVEN_NAME");
+                String lastName = resultSet.getString("LAST_NAME");
+                int indicator = resultSet.getInt("INDICATOR");
+                return givenName + " " + lastName + (indicator>0 ? " "+indicator : "");
+            }
+            else {
+                return null;
+            }
+        });
+
     }
 
 }

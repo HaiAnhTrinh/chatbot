@@ -31,10 +31,10 @@ public class RoomAvailabilityRepository {
         String addQuery = "insert into ROOM_AVAILABILITY(ROOM_NAME, DATE, AVAILABILITY) values ( ?, ?, ? )";
         String deleteQuery = "delete from ROOM_AVAILABILITY where DATE = ?";
 
-        List<String> rooms = jdbcTemplate.queryForList("select NAME from ROOM", String.class);
+        List<String> roomNames = jdbcTemplate.queryForList("select NAME from ROOM", String.class);
 
-        for(String room : rooms){
-            jdbcTemplate.update(addQuery, room, java.time.LocalDate.now().plusDays(7), "0".repeat(Configs.TIME_SLOT_NUMBER));
+        for(String roomName : roomNames){
+            jdbcTemplate.update(addQuery, roomName, java.time.LocalDate.now().plusDays(7), "0".repeat(Configs.TIME_SLOT_NUMBER));
         }
         jdbcTemplate.update(deleteQuery, java.time.LocalDate.now().minusDays(1));
     }
@@ -80,7 +80,7 @@ public class RoomAvailabilityRepository {
         availability.append(getAvailability(roomName, rawDate));
 
         for(int i=startSlot; i < endSlot; i++){
-            availability.setCharAt(i, updateType.equals(Configs.UPDATE_INSERT) ?'1' : '0');
+            availability.setCharAt(i, updateType.equals(Configs.AVAILABILITY_INSERT) ?'1' : '0');
         }
 
         jdbcTemplate.update(query, availability, rawDate, roomName);

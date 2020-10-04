@@ -40,9 +40,31 @@ public class RestAPIController {
     @CrossOrigin(origins = "*")
     @GetMapping("/test")
     public void test(){
-        String[] array = new String[]{"hai anh", "hoang le"};
-        System.out.println("array: " + Arrays.toString(array).substring(1, Arrays.toString(array).length()-1));
+        System.out.println("test");
+        String[] attendees = new String[]{"organiser", "attendee1", "attendee2", "attendee3"};
+        String[] addEmails = new String[]{"add1", "add2", "add3"};
+        String[] attendeeEmails = new String[6];
+        int index=0;
 
+        for(int i=0; i<attendees.length-1; i++){
+            System.out.println("loop1");
+            System.out.println(i);
+            if(!attendees[i].equals("organiser")){
+                System.out.println("not organiser");
+                attendeeEmails[i] = attendees[i];
+            }
+            else{
+                index = i;
+                System.out.println("is organiser");
+            }
+        }
+        attendeeEmails[index]=attendees[attendees.length-1];
+        for(int j=attendees.length-1; j<attendeeEmails.length; j++){
+            System.out.println("loop2");
+            attendeeEmails[j] = addEmails[j-(attendees.length-1)];
+        }
+
+        System.out.println(Arrays.toString(attendeeEmails));
     }
 
     @CrossOrigin(origins = "*")
@@ -50,18 +72,41 @@ public class RestAPIController {
     public ResponseEntity<Response> processRequest(@RequestBody Request request) throws GeneralSecurityException, IOException {
 
         System.out.println("INTENT: " + request.getQueryResult().getIntent().getDisplayName());
-//        String facebookId = request.getOriginalDetectIntentRequest().getPayload().getData().getSender().getId();
-        String facebookId = "3771109326251927";
-        String email = userRepository.getEmailFromFacebookId(facebookId);
-
-
         //follows the hierachy of Dialogflow response structure
         ResponseEntity<Response> response = new ResponseEntity<>(new Response(), HttpStatus.OK);
         LinkedList<ResponseObject> responseObjects = new LinkedList<>();
+        String intent = request.getQueryResult().getIntent().getDisplayName();
+//        String facebookId = request.getOriginalDetectIntentRequest().getPayload().getData().getSender().getId();
+        String facebookId = "3771109326251927";
+        String email;
+        CalendarServices services;
 
-        switch (request.getQueryResult().getIntent().getDisplayName()) {
+        if(userRepository.hasFacebookId(facebookId)){
+            email = userRepository.getEmailFromFacebookId(facebookId);
+            services = new CalendarServices(email);
+        }
+        else if(intent.equals("Register")){
+            String userEmail = request.getQueryResult().getParameters().getUserEmail();
+            if(userRepository.hasEmail(userEmail)){
+                userRepository.addNewFacebookId(facebookId, userEmail);
+                DialogflowServices.addTextResponse(responseObjects, "Thanks, you can now use all of my services");
+            }
+            else{
+                DialogflowServices.addTextResponse(responseObjects, "I don't recognise your email, please restart the process by typing \"register\".");
+            }
+            Objects.requireNonNull(response.getBody()).setFulfillmentMessages(responseObjects);
+            //return here because we don't want it to go into 'switch' statement, intent could still be valid
+            return response;
+        }
+        else {
+            DialogflowServices.addTextResponse(responseObjects, "I need to know your identity. Please type \"register\" so I can initiate the process.");
+            Objects.requireNonNull(response.getBody()).setFulfillmentMessages(responseObjects);
+            //return here because we don't want it to go into 'switch' statement, intent could still be valid
+            return response;
+        }
+
+        switch (intent) {
             case "Book a meeting - Retrieve info": {
-
                 String rawDate = Utils.getDateFromRequest(request);
                 String rawStartTime = Utils.getStartTimeFromRequest(request);
                 String rawEndTime = Utils.getEndTimeFromRequest(request);
@@ -87,7 +132,6 @@ public class RestAPIController {
                 }
                 else {
                     String[] attendeeEmails = attendeeMap.get("resultArray");
-                    CalendarServices services = new CalendarServices(email);
                     Map<String, Object> freeMap = services.isAllAvailable(rawDate,
                             rawStartTime, rawEndTime,email, attendeeEmails);
 
@@ -142,7 +186,6 @@ public class RestAPIController {
                                     DialogflowServices.addTextResponse(responseObjects,
                                             "The specified room is not available at the meeting time. I suggest "
                                                     + suggestedRoom + " instead");
-
                                 }
                             }
                         }
@@ -187,7 +230,7 @@ public class RestAPIController {
                         }
                         else {
                             //set the new location for the context
-                            OutputContexts outputContext = request.getQueryResult().getOutputContexts().get(0);
+                            OutputContexts outputContext = request.getQueryResult().getOutputContexts().getFirst();
                             outputContext.getParameters().setLocation(suggestedRoom);
                             outputContexts.add(outputContext);
                             Objects.requireNonNull(response.getBody()).setOutputContexts(outputContexts);
@@ -218,11 +261,10 @@ public class RestAPIController {
                     String[] attendeeEmails = userRepository.getEmailsFromNames(attendeeNames).get("resultArray");
 
                     //add the event to the calendar
-                    CalendarServices services = new CalendarServices(email);
                     services.addEvent(startTime, endTime, attendeeEmails, location, title);
 
                     //update room database
-                    roomAvailabilityRepository.updateAvailability(location, rawStartTime, rawEndTime, rawDate, Configs.UPDATE_INSERT);
+                    roomAvailabilityRepository.updateAvailability(location, rawStartTime, rawEndTime, rawDate, Configs.AVAILABILITY_INSERT);
 
                     DialogflowServices.addTextResponse(responseObjects,"Ok, the meeting has been successfully booked.");
                 }
@@ -246,8 +288,6 @@ public class RestAPIController {
                 break;
             }
             case "Cancel a meeting - userChoice": {
-                CalendarServices services = new CalendarServices(email);
-                //the queryText is the event id
                 services.cancelMeeting(request.getQueryResult().getParameters().getEventId(), roomAvailabilityRepository);
                 DialogflowServices.addTextResponse(responseObjects, "Ok I have deleted that meeting for you");
                 break;
@@ -276,19 +316,17 @@ public class RestAPIController {
             }
             case "Update a meeting - DateTime - GetInfo": {
                 //TODO: check the room db
-                CalendarServices services = new CalendarServices(email);
                 String rawDate = Utils.getDateFromRequest(request);
                 String rawStartTime = Utils.getStartTimeFromRequest(request);
                 String rawEndTime = Utils.getEndTimeFromRequest(request);
-                String eventId = DialogflowServices.getEventIdFromOutputContext(request);
-                System.out.println("EVENT ID: " + eventId);
+                String eventId = Utils.getEventIdFromOutputContext(request);
 
                 if(eventId != null){
                     if(services.updateMeetingTime(eventId, rawDate, rawStartTime, rawEndTime)){
                         DialogflowServices.addTextResponse(responseObjects, "The meeting time has been updated");
                     }
                     else {
-                        DialogflowServices.addTextResponse(responseObjects, "The new time is conflicting with others availibility");
+                        DialogflowServices.addTextResponse(responseObjects, "Someone is not available at that time.");
                     }
                 }
                 else {
@@ -298,9 +336,8 @@ public class RestAPIController {
                 break;
             }
             case "Update a meeting - Title - GetInfo": {
-                CalendarServices services = new CalendarServices(email);
                 String title = request.getQueryResult().getQueryText();
-                String eventId = DialogflowServices.getEventIdFromOutputContext(request);
+                String eventId = Utils.getEventIdFromOutputContext(request);
 
                 if(eventId != null){
                     services.updateMeetingTitle(eventId, title);
@@ -310,6 +347,50 @@ public class RestAPIController {
                     DialogflowServices.addTextResponse(responseObjects, Configs.ERROR_MESSAGE);
                 }
 
+                break;
+            }
+            case "Update a meeting - Add member": {
+                String eventId = Utils.getEventIdFromOutputContext(request);
+                String participants = services.getParticipants(eventId, userRepository);
+                if(participants.isEmpty()){
+                    DialogflowServices.addTextResponse(responseObjects, "Currently, you are the only participant");
+                }
+                else{
+                    DialogflowServices.addTextResponse(responseObjects, "Current participants are " + participants);
+                }
+                DialogflowServices.addTextResponse(responseObjects, "Who else do you want to add?");
+
+                break;
+            }
+            case "Update a meeting - Add member - GetInfo": {
+                //TODO: check the capacity
+                String eventId = Utils.getEventIdFromOutputContext(request);
+                String[] addNames = Utils.getAddNamesFromRequest(request);
+
+                String result = services.addParticipants(eventId, addNames, userRepository);
+                DialogflowServices.addTextResponse(responseObjects, result);
+                break;
+            }
+            case "Update a meeting - Remove member": {
+                String eventId = Utils.getEventIdFromOutputContext(request);
+                String participants = services.getParticipants(eventId, userRepository);
+                if(participants.isEmpty()){
+                    DialogflowServices.addTextResponse(responseObjects, "You are the only one in the meeting");
+                }
+                else{
+                    DialogflowServices.addTextResponse(responseObjects, "Here are the participants in that meeting");
+                    DialogflowServices.addTextResponse(responseObjects, participants);
+                    DialogflowServices.addTextResponse(responseObjects, "Who do you want to remove?");
+                }
+
+                break;
+            }
+            case "Update a meeting - Remove member - GetInfo": {
+                String eventId = Utils.getEventIdFromOutputContext(request);
+                String[] removeNames = Utils.getRemoveNamesFromRequest(request);
+
+                services.removeParticipants(eventId, removeNames, userRepository);
+                DialogflowServices.addTextResponse(responseObjects, "Event updated");
                 break;
             }
             case "View rooms": {
@@ -322,7 +403,6 @@ public class RestAPIController {
         }
 
         Objects.requireNonNull(response.getBody()).setFulfillmentMessages(responseObjects);
-
         return response;
     }
 }

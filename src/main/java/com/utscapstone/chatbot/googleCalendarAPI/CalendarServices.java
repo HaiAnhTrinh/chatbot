@@ -7,6 +7,7 @@ import com.utscapstone.chatbot.Configs;
 import com.utscapstone.chatbot.Utils;
 import com.utscapstone.chatbot.dialogflowAPI.entities.response.CardResponseObject;
 import com.utscapstone.chatbot.jdbc.repository.RoomAvailabilityRepository;
+import com.utscapstone.chatbot.jdbc.repository.UserRepository;
 
 import java.io.IOException;
 import java.security.GeneralSecurityException;
@@ -100,7 +101,7 @@ public class CalendarServices {
     }
 
     //get the busy calendar from the specified startTime
-    //endTime is 23:59:59 pm
+    //endTime is 23:59:59 pm to restrict looking for
     private int[] getDayFreeBusy(String startTime,
                                  String rawDate,
                                  String hostEmail,
@@ -204,7 +205,7 @@ public class CalendarServices {
                 Utils.getTimeFromRFC3339(event.getStart().getDateTime().toString()),
                 Utils.getTimeFromRFC3339(event.getEnd().getDateTime().toString()),
                 Utils.getDateFromRFC3339(event.getStart().getDateTime().toString()),
-                Configs.UPDATE_DETELE);
+                Configs.AVAILABILITY_DETELE);
     }
 
     //update a meeting
@@ -248,10 +249,94 @@ public class CalendarServices {
         return false;
     }
 
+    //update the title for a meeting
     public void updateMeetingTitle(String eventId, String newTitle) throws IOException {
         Event event = service.events().get(Configs.PRIMARY_CALENDAR, eventId).execute();
         event.setSummary(newTitle);
         service.events().update(Configs.PRIMARY_CALENDAR, eventId, event).execute();
+    }
+
+    //get the current participants of a meeting
+    //return a string containing all participants' names
+    public String getParticipants(String eventId, UserRepository userRepository) throws IOException {
+        Event event = service.events().get(Configs.PRIMARY_CALENDAR, eventId).execute();
+        List<EventAttendee> attendees = event.getAttendees();
+        LinkedList<String> attendeeNames = new LinkedList<>();
+
+        for(EventAttendee attendee : attendees){
+            if(!attendee.getEmail().equals(event.getOrganizer().getEmail())){
+                attendeeNames.add(userRepository.getNameFromEmail(attendee.getEmail()));
+            }
+        }
+
+        return attendeeNames.toString().substring(1, attendeeNames.toString().length()-1);
+    }
+
+    //add participants to a meeting
+    public String addParticipants(String eventId, String[] addNames, UserRepository userRepository) throws IOException {
+        Event event = service.events().get(Configs.PRIMARY_CALENDAR, eventId).execute();
+        List<EventAttendee> attendees = event.getAttendees();
+        String[] addEmails = userRepository.getEmailsFromNames(addNames).get("resultArray");
+        String[] attendeeEmails = new String[addNames.length + attendees.size() -1];
+        int index=0;
+
+        for(int i=0; i<attendees.size()-1; i++){
+            if(!attendees.get(i).getOrganizer()){
+                attendeeEmails[i] = attendees.get(i).getEmail();
+            }
+            else{
+                index = i;
+            }
+        }
+        attendeeEmails[index]=attendees.get(attendees.size()-1).getEmail();
+//        if (attendeeEmails.length - attendees.size() - 1 >= 0)
+//            System.arraycopy(addEmails,
+//                    attendees.size() - 1 - (attendees.size() - 1), attendeeEmails,
+//                    attendees.size() - 1,
+//                    attendeeEmails.length - attendees.size() - 1);
+        for(int j=attendees.size()-1; j<attendeeEmails.length; j++){
+            attendeeEmails[j] = addEmails[j-(attendees.size()-1)];
+        }
+
+        //temporary delete the meeting for availability checking
+        service.events().delete(Configs.PRIMARY_CALENDAR, eventId).execute();
+        Map<String, Object> availableMap =
+                isAllAvailable(Utils.getDateFromRFC3339(event.getStart().getDateTime().toString()),
+                        Utils.getTimeFromRFC3339(event.getStart().getDateTime().toString()),
+                        Utils.getTimeFromRFC3339(event.getEnd().getDateTime().toString()),
+                        event.getOrganizer().getEmail(),
+                        attendeeEmails);
+        boolean check = Boolean.parseBoolean(availableMap.get(Configs.IS_ALL_AVAILABLE).toString());
+        //reimport the deleted event
+        service.events().calendarImport(Configs.PRIMARY_CALENDAR, event).execute();
+
+        if(check){
+            for(String addEmail : addEmails){
+                attendees.add(new EventAttendee().setEmail(addEmail));
+            }
+            event.setAttendees(attendees);
+            service.events().update(Configs.PRIMARY_CALENDAR, event.getId(), event).execute();
+            return "New participants added";
+        }
+        else {
+            return "Someone is unvailable, I suggest you consider changing the meeting time to be from "
+                    + availableMap.get(Configs.SUGGESTED_START_TIME).toString() +
+                    " to " + availableMap.get(Configs.SUGGESTED_END_TIME).toString() + ".";
+        }
+    }
+
+    //remove participants from a meeting
+    public void removeParticipants(String eventId, String[] removeNames, UserRepository userRepository) throws IOException {
+        Event event = service.events().get(Configs.PRIMARY_CALENDAR, eventId).execute();
+        List<EventAttendee> attendees = event.getAttendees();
+        String[] removeEmails = userRepository.getEmailsFromNames(removeNames).get("resultArray");
+
+        for(String email : removeEmails){
+            attendees.removeIf(attendee -> Objects.equals(email, attendee.getEmail()));
+        }
+
+        event.setAttendees(attendees);
+        service.events().update(Configs.PRIMARY_CALENDAR, event.getId(), event).execute();
     }
 
 }

@@ -1,5 +1,6 @@
 package com.utscapstone.chatbot;
 
+import com.utscapstone.chatbot.dialogflowAPI.entities.request.OutputContexts;
 import com.utscapstone.chatbot.dialogflowAPI.entities.request.Request;
 
 import java.util.regex.Matcher;
@@ -39,6 +40,14 @@ public class Utils {
         return request.getQueryResult().getParameters().getLocation();
     }
 
+    static public String[] getRemoveNamesFromRequest(Request request){
+        return request.getQueryResult().getParameters().getRemoveNames();
+    }
+
+    static public String[] getAddNamesFromRequest(Request request){
+        return request.getQueryResult().getParameters().getAddNames();
+    }
+
     static public String getStartTimeFromOutputContexts(Request request){
         return getTimeFromRFC3339(request.getQueryResult().getOutputContexts().getFirst().getParameters().getStartTime()[0]);
     }
@@ -61,6 +70,15 @@ public class Utils {
 
     static public String getTitleFromOutputContexts(Request request){
         return request.getQueryResult().getOutputContexts().getFirst().getParameters().getTitle();
+    }
+
+    static public String getEventIdFromOutputContext(Request request){
+        for(OutputContexts o : request.getQueryResult().getOutputContexts()){
+            if(o.getName().substring(95).equals("updateameeting-eventchosen-followup")){
+                return o.getParameters().getEventId();
+            }
+        }
+        return null;
     }
 
     static public String convertToRFC3339(String date, String time){

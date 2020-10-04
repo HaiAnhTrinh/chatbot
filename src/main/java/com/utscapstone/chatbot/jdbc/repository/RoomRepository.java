@@ -33,22 +33,20 @@ public class RoomRepository {
     }
 
     public String lookForEnoughCapacityAndAvailableRoom(String rawStartTime, String rawEndTime, String rawDate, int numberOfParticipants){
-        String query = "select NAME from ROOM where CAPACITY >= ?";
+        String query = "select NAME from ROOM where CAPACITY >= ? order by CAPACITY";
         RoomAvailabilityRepository roomAvailabilityRepository = new RoomAvailabilityRepository(jdbcTemplate);
-        String suggestedRoom = "";
 
         List<String> enoughRooms = jdbcTemplate.queryForList(query, new Object[]{numberOfParticipants+1}, String.class);
         LinkedList<String> availableRooms = roomAvailabilityRepository.lookForAvailableRooms(rawStartTime,rawEndTime,rawDate);
 
-        for(String roomName : enoughRooms){
+        for(String enoughRoom : enoughRooms){
             for(String availableRoom : availableRooms){
-                if(roomName.equals(availableRoom)){
-                    suggestedRoom = availableRoom;
+                if(enoughRoom.equals(availableRoom)){
+                    return availableRoom;
                 }
             }
         }
-
-        return suggestedRoom;
+        return "";
     }
 
 }
