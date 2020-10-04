@@ -12,7 +12,7 @@ There will be a youtube link here for the demo
 ## **Getting Started**
 These instructions will get you a copy of the project up and running on your local machine for development and testing purposes.
 
-#### **Prerequisites**
+### **Prerequisites**
 
 1. Follow this link to set up a new project in Google Cloud Platform. For this project, just follow the _Create a project_ section. [Google Cloud Setup](https://cloud.google.com/dialogflow/es/docs/quick/setup#project)
 
@@ -26,7 +26,7 @@ These instructions will get you a copy of the project up and running on your loc
 
 6. Install [ngrok](https://ngrok.com/download) (if you don't own a public server or domain).
 
-#### **Installing**
+### **Installing**
 **Step 1:** Configure the JDK to be 12.0.1 or above, install all dependencies with Maven.
 
 **Step 2:** Download the created credentials for OAuth 2.0 as `credentials.json` inside `src/main/resources/` directory.
