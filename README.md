@@ -33,7 +33,7 @@ These instructions will get you a copy of the project up and running on your loc
 
 **Step 3:** Modify Spring configurations for H2 database in `application.properties`. Change the datasource.url to suit your working directory.
 
-![Image](file:///C:/Users/trinh/Desktop/UTS/YEAR%205/Engineering%20Capstone/application-properties.PNG)
+![Image](https://user-images.githubusercontent.com/31613318/95028809-cf031180-06ee-11eb-9001-133d953d2c28.PNG)
 
 We use H2 embedded database to avoid complex configuration during the development process.
 
