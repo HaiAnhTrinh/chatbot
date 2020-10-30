@@ -21,7 +21,7 @@ create table ROOM_AVAILABILITY
 (
     ROOM_NAME    VARCHAR            not null,
     DATE         DATE               not null,
-    AVAILABILITY CHAR(96) default 0 not null,
+    AVAILABILITY CHAR(96) default '000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000' not null,
     constraint ROOM_AVAILABILITY_ROOM_NAME_FK
         foreign key (ROOM_NAME) references ROOM (NAME)
             on update cascade on delete cascade
