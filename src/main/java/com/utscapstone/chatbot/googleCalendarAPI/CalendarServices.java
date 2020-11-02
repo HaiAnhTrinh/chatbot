@@ -227,6 +227,7 @@ public class CalendarServices {
         if(eventAttendees != null){
             for(EventAttendee a : eventAttendees){
                 attendeeEmails[index] = a.getEmail();
+                index++;
             }
         }
 
@@ -273,7 +274,7 @@ public class CalendarServices {
         String date = Utils.getDateFromRFC3339(event.getStart().getDateTime().toString());
         String startTime = Utils.getTimeFromRFC3339(event.getStart().getDateTime().toString());
         String endTime = Utils.getTimeFromRFC3339(event.getEnd().getDateTime().toString());
-        int numberOfParticipants = event.getAttendees().size();
+        int numberOfParticipants = event.getAttendees() != null ? event.getAttendees().size(): 0;
         boolean canFit = roomRepository.canRoomFit(newLocation, numberOfParticipants);
         boolean isAvailable = roomAvailabilityRepository.isRoomAvailable(newLocation, startTime, endTime, date);
 
@@ -316,7 +317,7 @@ public class CalendarServices {
     }
 
     //add participants to a meeting
-    public String addParticipants(String eventId, String[] addNames, UserRepository userRepository) throws IOException {
+    public String addParticipants(String eventId, String[] addNames, UserRepository userRepository, RoomRepository roomRepository) throws IOException {
         Event event = service.events().get(Configs.PRIMARY_CALENDAR, eventId).execute();
         List<EventAttendee> attendees = event.getAttendees() != null ? event.getAttendees() : new LinkedList<>();
         System.out.println("ATTENDEE SIZE: " + attendees.size());
@@ -341,17 +342,27 @@ public class CalendarServices {
                         Utils.getTimeFromRFC3339(event.getEnd().getDateTime().toString()),
                         event.getOrganizer().getEmail(),
                         attendeeEmails);
-        boolean check = Boolean.parseBoolean(availableMap.get(Configs.IS_ALL_AVAILABLE).toString());
+        boolean isAllAvailable = Boolean.parseBoolean(availableMap.get(Configs.IS_ALL_AVAILABLE).toString());
+        boolean canRoomFit = roomRepository.canRoomFit(event.getLocation(), attendeeEmails.length);
         //reimport the deleted event
         service.events().calendarImport(Configs.PRIMARY_CALENDAR, event).execute();
 
-        if(check){
-            for(String addEmail : addEmails){
-                attendees.add(new EventAttendee().setEmail(addEmail));
+        if(isAllAvailable){
+            if(canRoomFit){
+                for(String addEmail : addEmails){
+                    attendees.add(new EventAttendee().setEmail(addEmail));
+                }
+                event.setAttendees(attendees);
+                service.events().update(Configs.PRIMARY_CALENDAR, event.getId(), event).execute();
+                return "New participants added";
             }
-            event.setAttendees(attendees);
-            service.events().update(Configs.PRIMARY_CALENDAR, event.getId(), event).execute();
-            return "New participants added";
+            else {
+                String suggestedRoom = roomRepository.lookForEnoughCapacityAndAvailableRoom(Utils.getTimeFromRFC3339(event.getStart().getDateTime().toString()),
+                        Utils.getTimeFromRFC3339(event.getEnd().getDateTime().toString()),
+                        Utils.getDateFromRFC3339(event.getStart().getDateTime().toString()),
+                        attendeeEmails.length+1);
+                return "The current room does not have enough capacity." + (!suggestedRoom.isEmpty() ? "I suggest moving the location to " + suggestedRoom : "But I cannot find any room");
+            }
         }
         else {
             return "Someone is unvailable, I suggest you consider changing the meeting time to be from "

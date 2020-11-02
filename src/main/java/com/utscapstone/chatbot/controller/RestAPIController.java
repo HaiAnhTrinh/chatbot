@@ -358,7 +358,7 @@ public class RestAPIController {
                         DialogflowServices.addTextResponse(responseObjects, "The new location does not have enough capacity");
                     }
                     else {
-                        DialogflowServices.addTextResponse(responseObjects, "The new location is not available");
+                        DialogflowServices.addTextResponse(responseObjects, "The new location is not available for booking");
                     }
                 }
                 else {
@@ -385,7 +385,7 @@ public class RestAPIController {
                 String eventId = Utils.getEventIdFromOutputContext(request);
                 String[] addNames = Utils.getAddNamesFromRequest(request);
 
-                String result = services.addParticipants(eventId, addNames, userRepository);
+                String result = services.addParticipants(eventId, addNames, userRepository, roomRepository);
                 DialogflowServices.addTextResponse(responseObjects, result);
                 break;
             }
