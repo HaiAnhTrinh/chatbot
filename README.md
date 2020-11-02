@@ -7,7 +7,7 @@ Supervisor: [Dr. Wei Liu](https://www.uts.edu.au/staff/wei.liu)
 Scheduling Chatbot enables the users to book a meeting on the Google Calendar and reserve a room available in a company. The chatbot is able to detect conflicts and suggest the closest suitable timeframe for all attendees. It also helps allocate the meeting to the most suitable room provided within an organisation. All communication will take place on Facebook Messenger.
 
 ## **Demo**
-There will be a youtube link here for the demo
+https://www.youtube.com/watch?v=0N0W994G8Q4
 
 ## **Getting Started**
 These instructions will get you a copy of the project up and running on your local machine for development and testing purposes.
