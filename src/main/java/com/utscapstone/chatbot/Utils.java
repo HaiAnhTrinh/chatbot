@@ -111,7 +111,7 @@ public class Utils {
         int hour = timeSlot/4;
         int minute = Math.floorMod(timeSlot, 4) * 15;
 
-        return String.format("%02d", hour) + ":" + String.format("%02d", minute) + ":00+10:00";
+        return String.format("%02d", hour) + ":" + String.format("%02d", minute) + ":00+11:00";
     }
 
     static public int getMeetingDuration(String startTime, String endTime){

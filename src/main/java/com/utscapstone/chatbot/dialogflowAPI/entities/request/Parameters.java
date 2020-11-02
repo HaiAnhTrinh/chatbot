@@ -77,4 +77,12 @@ public class Parameters {
     public String getUserEmail() {
         return userEmail;
     }
+
+    public void setRemoveNames(String[] removeNames) {
+        this.removeNames = removeNames;
+    }
+
+    public void setAddNames(String[] addNames) {
+        this.addNames = addNames;
+    }
 }

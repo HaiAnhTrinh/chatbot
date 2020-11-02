@@ -7,6 +7,7 @@ import com.utscapstone.chatbot.Configs;
 import com.utscapstone.chatbot.Utils;
 import com.utscapstone.chatbot.dialogflowAPI.entities.response.CardResponseObject;
 import com.utscapstone.chatbot.jdbc.repository.RoomAvailabilityRepository;
+import com.utscapstone.chatbot.jdbc.repository.RoomRepository;
 import com.utscapstone.chatbot.jdbc.repository.UserRepository;
 
 import java.io.IOException;
@@ -38,7 +39,6 @@ public class CalendarServices {
         event.setStart(new EventDateTime().setDateTime(startDateTime));
         event.setEnd(new EventDateTime().setDateTime(endDateTime));
         event.setAttendees(Arrays.asList(attendees));
-
         service.events().insert(Configs.PRIMARY_CALENDAR, event).execute();
     }
 
@@ -111,7 +111,7 @@ public class CalendarServices {
         int[] timeSlot = new int[Configs.TIME_SLOT_NUMBER];
         Arrays.fill(timeSlot,Utils.convertRFC3339ToTimeSlot(startTime), timeSlot.length, 1);
 
-        String endTime = Utils.convertToRFC3339(rawDate, "23:59:59+10:00");
+        String endTime = Utils.convertToRFC3339(rawDate, "23:59:59+11:00");
         FreeBusyResponse response = getFreeBusyResponse(startTime, endTime, hostEmail, attendeeEmails);
 
         for (Map.Entry<String, FreeBusyCalendar> entry : response.getCalendars().entrySet()) {
@@ -144,7 +144,7 @@ public class CalendarServices {
         freeBusyRequest
                 .setTimeMin(new DateTime(startTime))
                 .setTimeMax(new DateTime(endTime))
-                .setTimeZone("+10:00");
+                .setTimeZone("+11:00");
         FreeBusyRequestItem[] freeBusyRequestItems = new FreeBusyRequestItem[attendeeEmails.length + 1];
 
         for(int i=0; i < freeBusyRequestItems.length; i++){
@@ -249,11 +249,50 @@ public class CalendarServices {
         return false;
     }
 
+    //get the title for a meeting
+    public String getMeetingTitle(String eventId) throws IOException {
+        return service.events().get(Configs.PRIMARY_CALENDAR, eventId).execute().getSummary();
+    }
+
     //update the title for a meeting
     public void updateMeetingTitle(String eventId, String newTitle) throws IOException {
         Event event = service.events().get(Configs.PRIMARY_CALENDAR, eventId).execute();
         event.setSummary(newTitle);
         service.events().update(Configs.PRIMARY_CALENDAR, eventId, event).execute();
+    }
+
+    //get the location for a meeting
+    public String getMeetingLocation(String eventId) throws IOException {
+        return service.events().get(Configs.PRIMARY_CALENDAR, eventId).execute().getLocation();
+    }
+
+    //update the location for a meeting
+    //return 0 if the new room is valid, 1 if not enough capacity, 2 if is not available
+    public int updateMeetingLocation(String eventId, String newLocation, RoomRepository roomRepository, RoomAvailabilityRepository roomAvailabilityRepository) throws IOException {
+        Event event = service.events().get(Configs.PRIMARY_CALENDAR, eventId).execute();
+        String date = Utils.getDateFromRFC3339(event.getStart().getDateTime().toString());
+        String startTime = Utils.getTimeFromRFC3339(event.getStart().getDateTime().toString());
+        String endTime = Utils.getTimeFromRFC3339(event.getEnd().getDateTime().toString());
+        int numberOfParticipants = event.getAttendees().size();
+        boolean canFit = roomRepository.canRoomFit(newLocation, numberOfParticipants);
+        boolean isAvailable = roomAvailabilityRepository.isRoomAvailable(newLocation, startTime, endTime, date);
+
+        if(canFit && isAvailable){
+            roomAvailabilityRepository.updateAvailability(event.getLocation(), startTime, endTime, date, Configs.AVAILABILITY_DETELE);
+            roomAvailabilityRepository.updateAvailability(newLocation, startTime, endTime, date, Configs.AVAILABILITY_INSERT);
+            event.setLocation(newLocation);
+            service.events().update(Configs.PRIMARY_CALENDAR, eventId, event).execute();
+        }
+
+        if(canFit && isAvailable){
+            return 0;
+        }
+        else if(!canFit) {
+            return 1;
+        }
+        else {
+            return 2;
+        }
     }
 
     //get the current participants of a meeting
@@ -263,39 +302,35 @@ public class CalendarServices {
         List<EventAttendee> attendees = event.getAttendees();
         LinkedList<String> attendeeNames = new LinkedList<>();
 
-        for(EventAttendee attendee : attendees){
-            if(!attendee.getEmail().equals(event.getOrganizer().getEmail())){
-                attendeeNames.add(userRepository.getNameFromEmail(attendee.getEmail()));
-            }
+        if(attendees == null){
+            return "";
         }
-
-        return attendeeNames.toString().substring(1, attendeeNames.toString().length()-1);
+        else{
+            for(EventAttendee attendee : attendees){
+                if(!attendee.getEmail().equals(event.getOrganizer().getEmail())){
+                    attendeeNames.add(userRepository.getNameFromEmail(attendee.getEmail()));
+                }
+            }
+            return attendeeNames.toString().substring(1, attendeeNames.toString().length()-1);
+        }
     }
 
     //add participants to a meeting
     public String addParticipants(String eventId, String[] addNames, UserRepository userRepository) throws IOException {
         Event event = service.events().get(Configs.PRIMARY_CALENDAR, eventId).execute();
-        List<EventAttendee> attendees = event.getAttendees();
+        List<EventAttendee> attendees = event.getAttendees() != null ? event.getAttendees() : new LinkedList<>();
+        System.out.println("ATTENDEE SIZE: " + attendees.size());
         String[] addEmails = userRepository.getEmailsFromNames(addNames).get("resultArray");
-        String[] attendeeEmails = new String[addNames.length + attendees.size() -1];
+        String[] attendeeEmails = new String[addEmails.length + attendees.size()];
         int index=0;
 
-        for(int i=0; i<attendees.size()-1; i++){
-            if(!attendees.get(i).getOrganizer()){
-                attendeeEmails[i] = attendees.get(i).getEmail();
-            }
-            else{
-                index = i;
-            }
+        for(EventAttendee attendee : attendees){
+            attendeeEmails[index] = attendee.getEmail();
+            index++;
         }
-        attendeeEmails[index]=attendees.get(attendees.size()-1).getEmail();
-//        if (attendeeEmails.length - attendees.size() - 1 >= 0)
-//            System.arraycopy(addEmails,
-//                    attendees.size() - 1 - (attendees.size() - 1), attendeeEmails,
-//                    attendees.size() - 1,
-//                    attendeeEmails.length - attendees.size() - 1);
-        for(int j=attendees.size()-1; j<attendeeEmails.length; j++){
-            attendeeEmails[j] = addEmails[j-(attendees.size()-1)];
+
+        for(int i=index; i < attendeeEmails.length; i++){
+            attendeeEmails[i] = addEmails[i-index];
         }
 
         //temporary delete the meeting for availability checking
@@ -331,8 +366,16 @@ public class CalendarServices {
         List<EventAttendee> attendees = event.getAttendees();
         String[] removeEmails = userRepository.getEmailsFromNames(removeNames).get("resultArray");
 
+        for (EventAttendee a : attendees){
+            System.out.println("event attendees: " + a.getEmail());
+        }
+
         for(String email : removeEmails){
+            System.out.println("remove email: " + email);
             attendees.removeIf(attendee -> Objects.equals(email, attendee.getEmail()));
+        }
+        for (EventAttendee a : attendees){
+            System.out.println("remaining attendees: " + a.getEmail());
         }
 
         event.setAttendees(attendees);

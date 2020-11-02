@@ -7,8 +7,10 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow;
 import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.client.util.store.FileDataStoreFactory;
 import com.google.api.services.calendar.Calendar;
+import com.google.api.services.calendar.CalendarScopes;
 import com.utscapstone.chatbot.ChatbotApplication;
 import com.utscapstone.chatbot.Configs;
 
@@ -17,6 +19,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.security.GeneralSecurityException;
+import java.util.Collections;
 
 public class Authorization {
 
@@ -32,12 +35,12 @@ public class Authorization {
         if (in == null) {
             throw new FileNotFoundException("Resource not found: " + Configs.CREDENTIALS_FILE_PATH);
         }
-        GoogleClientSecrets clientSecrets = GoogleClientSecrets.load(Configs.JSON_FACTORY, new InputStreamReader(in));
+        GoogleClientSecrets clientSecrets = GoogleClientSecrets.load(JacksonFactory.getDefaultInstance(), new InputStreamReader(in));
 
         // Build flow and trigger user authorization request.
         GoogleAuthorizationCodeFlow flow = new GoogleAuthorizationCodeFlow.Builder(
-                HTTP_TRANSPORT, Configs.JSON_FACTORY, clientSecrets, Configs.SCOPES)
-                .setDataStoreFactory(new FileDataStoreFactory(new java.io.File(Configs.TOKENS_DIRECTORY_PATH)))
+                HTTP_TRANSPORT, JacksonFactory.getDefaultInstance(), clientSecrets, Collections.singletonList(CalendarScopes.CALENDAR))
+                .setDataStoreFactory(new FileDataStoreFactory(new java.io.File("tokens")))
                 .setAccessType("offline")
                 .build();
         LocalServerReceiver receiver = new LocalServerReceiver.Builder().setPort(8888).build();
@@ -48,7 +51,7 @@ public class Authorization {
     public Calendar getService(String userEmail) throws GeneralSecurityException, IOException {
         // Build a new authorized API client service.
         final NetHttpTransport HTTP_TRANSPORT = GoogleNetHttpTransport.newTrustedTransport();
-        return new Calendar.Builder(HTTP_TRANSPORT, Configs.JSON_FACTORY, getCredentials(HTTP_TRANSPORT, userEmail))
+        return new Calendar.Builder(HTTP_TRANSPORT, JacksonFactory.getDefaultInstance(), getCredentials(HTTP_TRANSPORT, userEmail))
                 .setApplicationName(Configs.APPLICATION_NAME)
                 .build();
     }

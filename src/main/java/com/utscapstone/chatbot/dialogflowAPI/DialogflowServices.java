@@ -1,5 +1,6 @@
 package com.utscapstone.chatbot.dialogflowAPI;
 
+import com.utscapstone.chatbot.Utils;
 import com.utscapstone.chatbot.dialogflowAPI.entities.request.OutputContexts;
 import com.utscapstone.chatbot.dialogflowAPI.entities.request.Request;
 import com.utscapstone.chatbot.dialogflowAPI.entities.response.CardResponseObject;
@@ -52,6 +53,23 @@ public class DialogflowServices {
         outputContext.setLifespanCount(0);
         outputContexts.add(outputContext);
         return outputContexts;
+    }
+
+    public static OutputContexts updateTime(Request request, String rawDate, String rawStartTime, String rawEndTime){
+        OutputContexts outputContext = request.getQueryResult().getOutputContexts().getFirst();
+        outputContext.getParameters().setStartTime(new String[]{Utils.convertToRFC3339(rawDate, rawStartTime)});
+        outputContext.getParameters().setEndTime(new String[]{Utils.convertToRFC3339(rawDate, rawEndTime)});
+        outputContext.getParameters().setRemoveNames(new String[]{});
+        outputContext.getParameters().setAddNames(new String[]{});
+        return outputContext;
+    }
+
+    public static OutputContexts updateLocation(Request request, String suggestedRoom){
+        OutputContexts outputContext = request.getQueryResult().getOutputContexts().getFirst();
+        outputContext.getParameters().setLocation(suggestedRoom);
+        outputContext.getParameters().setRemoveNames(new String[]{});
+        outputContext.getParameters().setAddNames(new String[]{});
+        return outputContext;
     }
 
 }
